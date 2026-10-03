@@ -865,18 +865,21 @@ ${webContext}
 // START SERVER
 // ==========================================
 
+const PORT = process.env.PORT || 3000;
+
 app.listen(
 
-    3000,
+    PORT,
 
-    "127.0.0.1",
+    "0.0.0.0",
 
     () => {
 
         console.log(
-            "MyAI Backend running on http://127.0.0.1:3000"
+            `MyAI Backend running on port ${PORT}`
         );
 
     }
 
 );
+
