@@ -1,885 +1,225 @@
 const express = require("express");
 const cors = require("cors");
-const axios = require("axios");
+const dotenv = require("dotenv");
 const fs = require("fs");
 const path = require("path");
-require("dotenv").config();
+
+dotenv.config();
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
+// Frontend files
+app.use(express.static(__dirname));
 
-// ==========================================
-// MEMORY
-// ==========================================
-
+// Memory file
 const memoryFile = path.join(__dirname, "memory.json");
 
+let memory = {
+    userName: "",
+    founderName: "Saurabh",
+    preferences: [],
+    facts: [],
+    importantInfo: [],
+    conversation: []
+};
 
-function createDefaultMemory() {
-    return {
-        userName: "",
-        founderName: "",
-        preferences: [],
-        facts: [],
-        importantInfo: [],
-        conversation: []
-    };
-}
-
-
-function loadMemory() {
-
-    try {
-
-        if (!fs.existsSync(memoryFile)) {
-            return createDefaultMemory();
-        }
-
-        const data = fs.readFileSync(
-            memoryFile,
-            "utf8"
+try {
+    if (fs.existsSync(memoryFile)) {
+        const savedMemory = JSON.parse(
+            fs.readFileSync(memoryFile, "utf8")
         );
 
-        if (!data.trim()) {
-            return createDefaultMemory();
-        }
-
-        const saved = JSON.parse(data);
-
-        return {
-            ...createDefaultMemory(),
-            ...saved
+        memory = {
+            ...memory,
+            ...savedMemory
         };
-
-    } catch (error) {
-
-        console.log(
-            "Memory load error:",
-            error.message
-        );
-
-        return createDefaultMemory();
     }
+} catch (error) {
+    console.log("Memory load error:", error.message);
 }
 
-
-function saveMemory(memory) {
-
+// Save memory
+function saveMemory() {
     try {
-
         fs.writeFileSync(
             memoryFile,
-            JSON.stringify(memory, null, 2),
-            "utf8"
+            JSON.stringify(memory, null, 2)
         );
-
     } catch (error) {
-
-        console.log(
-            "Memory save error:",
-            error.message
-        );
+        console.log("Memory save error:", error.message);
     }
 }
 
-
-// ==========================================
-// REMEMBER USER INFORMATION
-// ==========================================
-
-function rememberInfo(message, memory) {
-
-    const text = message.trim();
-
-
-    // ==================================
-    // USER NAME
-    // ==================================
-
-    const nameMatch = text.match(
-        /(?:mera naam|my name is|naam mera)\s+(?:hai\s+)?([a-zA-Z][a-zA-Z .'-]{0,40})/i
-    );
-
-    if (nameMatch) {
-
-        const name = nameMatch[1]
-            .replace(/\s+hai$/i, "")
-            .trim();
-
-        if (name) {
-            memory.userName = name;
-        }
-    }
-
-
-    // ==================================
-    // FOUNDER / OWNER
-    // ==================================
-
-    if (
-        /(?:i am|i'm|main|mai|mein)\s+(?:the\s+)?(?:founder|owner|creator|maker|developer)/i.test(text) ||
-        /(?:founder|owner|creator|maker)\s+(?:of\s+)?(?:myai|this ai|this website)/i.test(text)
-    ) {
-
-        if (memory.userName) {
-            memory.founderName = memory.userName;
-        }
-    }
-
-
-    // ==================================
-    // EXPLICIT FOUNDER NAME
-    // ==================================
-
-    const founderMatch = text.match(
-        /(?:founder|owner|creator|maker)\s+(?:is|hai|ka naam hai)\s+([a-zA-Z][a-zA-Z .'-]{0,40})/i
-    );
-
-    if (founderMatch) {
-
-        const founder = founderMatch[1].trim();
-
-        if (founder) {
-            memory.founderName = founder;
-        }
-    }
-
-
-    // ==================================
-    // REMEMBER IMPORTANT INFORMATION
-    // ==================================
-
-    if (
-        /^(remember|yaad rakho|yaad rakh|ise yaad)/i.test(text)
-    ) {
-
-        const info = text
-            .replace(
-                /^(remember|yaad rakho|yaad rakh|ise yaad)\s*:?\s*/i,
-                ""
-            )
-            .trim();
-
-        if (
-            info &&
-            !memory.importantInfo.includes(info)
-        ) {
-
-            memory.importantInfo.push(info);
-        }
-    }
-
-
-    return memory;
-}
-
-
-// ==========================================
-// MEMORY CONTEXT
-// ==========================================
-
-function buildMemoryContext(memory) {
-
-    let context = "";
-
-
-    if (memory.userName) {
-
-        context +=
-            `User's name: ${memory.userName}\n`;
-    }
-
-
-    if (memory.founderName) {
-
-        context +=
-            `MyAI founder/owner: ${memory.founderName}\n`;
-    }
-
-
-    if (memory.preferences.length > 0) {
-
-        context +=
-            "User preferences:\n" +
-            memory.preferences
-                .slice(-20)
-                .map(item => "- " + item)
-                .join("\n") +
-            "\n";
-    }
-
-
-    if (memory.facts.length > 0) {
-
-        context +=
-            "User facts:\n" +
-            memory.facts
-                .slice(-20)
-                .map(item => "- " + item)
-                .join("\n") +
-            "\n";
-    }
-
-
-    if (memory.importantInfo.length > 0) {
-
-        context +=
-            "Important information:\n" +
-            memory.importantInfo
-                .slice(-30)
-                .map(item => "- " + item)
-                .join("\n") +
-            "\n";
-    }
-
-
-    return context;
-}
-
-
-// ==========================================
-// TAVILY WEB SEARCH
-// ==========================================
-
-async function searchTavily(query) {
-
-    try {
-
-        const apiKey =
-            process.env.TAVILY_API_KEY;
-
-
-        if (!apiKey) {
-
-            console.log(
-                "TAVILY_API_KEY not found."
-            );
-
-            return "";
-        }
-
-
-        const response = await axios.post(
-
-            "https://api.tavily.com/search",
-
-            {
-                api_key: apiKey,
-                query: query,
-                search_depth: "basic",
-                topic: "general",
-                max_results: 5,
-                include_answer: true
-            },
-
-            {
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
-
-                timeout: 10000
-            }
-        );
-
-
-        const results =
-            response.data?.results || [];
-
-
-        if (results.length === 0) {
-            return "";
-        }
-
-
-        let output =
-            "TAVILY WEB SEARCH RESULTS:\n\n";
-
-
-        if (response.data?.answer) {
-
-            output +=
-                "Summary:\n" +
-                response.data.answer +
-                "\n\n";
-        }
-
-
-        results.forEach((item, index) => {
-
-            output +=
-                `${index + 1}. ${item.title || "No title"}\n`;
-
-            if (item.content) {
-
-                output +=
-                    `Content: ${item.content}\n`;
-            }
-
-            if (item.url) {
-
-                output +=
-                    `Source: ${item.url}\n`;
-            }
-
-            output += "\n";
-        });
-
-
-        return output;
-
-    } catch (error) {
-
-        console.log(
-            "Tavily search error:",
-            error.response?.data ||
-            error.message
-        );
-
-        return "";
-    }
-}
-
-
-// ==========================================
-// CHECK IF WEB SEARCH IS NEEDED
-// ==========================================
-
-function needsWebSearch(message) {
-
-    const text =
-        message.toLowerCase().trim();
-
-
-    const searchWords = [
-
-        "search",
-        "google",
-        "internet",
-        "web",
-        "online",
-        "latest",
-        "today",
-        "current",
-        "news",
-        "recent",
-        "price",
-        "weather",
-        "wikipedia",
-        "who is",
-        "what is",
-        "what are",
-        "who was",
-        "history of",
-        "information about",
-        "tell me about",
-        "kya hai",
-        "kaun hai",
-        "ke bare mein",
-        "ke baare mein",
-        "history",
-        "meaning of"
-
-    ];
-
-
-    return searchWords.some(
-        word => text.includes(word)
-    );
-}
-
-
-// ==========================================
-// HEALTH CHECK
-// ==========================================
-
+// Home page
 app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "index.html"));
+});
 
+// Server health check
+app.get("/health", (req, res) => {
     res.json({
         status: "online",
-        message: "MyAI Backend is running."
+        message: "MyAI Backend is Running"
     });
-
 });
 
-
-// ==========================================
-// MEMORY TEST
-// ==========================================
-
-app.get("/api/memory", (req, res) => {
-
-    const memory = loadMemory();
-
+// Simple memory endpoint
+app.get("/memory", (req, res) => {
     res.json(memory);
-
 });
 
+// Save user name
+app.post("/memory/name", (req, res) => {
+    const { userName } = req.body;
 
-// ==========================================
-// CHAT API
-// ==========================================
+    if (userName) {
+        memory.userName = userName;
+        saveMemory();
+    }
 
-app.post("/api/chat", async (req, res) => {
+    res.json({
+        success: true,
+        memory
+    });
+});
 
+// AI chat
+app.post("/chat", async (req, res) => {
     try {
+        const { message } = req.body;
 
-        const message =
-            String(req.body.message || "").trim();
-
-
-        if (!message) {
-
+        if (!message || !message.trim()) {
             return res.status(400).json({
-                reply: "Message empty hai."
+                error: "Message is required"
             });
         }
 
+        const userMessage = message.trim();
 
-        // ==================================
-        // LOAD MEMORY
-        // ==================================
+        // Founder/name memory
+        const lowerMessage = userMessage.toLowerCase();
 
-        let memory = loadMemory();
+        if (
+            lowerMessage.includes("mera naam") ||
+            lowerMessage.includes("my name")
+        ) {
+            if (memory.userName) {
+                return res.json({
+                    reply: `Tumhara naam ${memory.userName} hai.`
+                });
+            }
+        }
 
+        if (
+            lowerMessage.includes("kisne banaya") ||
+            lowerMessage.includes("who created you") ||
+            lowerMessage.includes("who made you") ||
+            lowerMessage.includes("founder")
+        ) {
+            return res.json({
+                reply: `Mujhe mere founder ${memory.founderName} ne banaya hai.`
+            });
+        }
 
-        memory =
-            rememberInfo(message, memory);
-
+        if (!process.env.OPENROUTER_API_KEY) {
+            return res.status(500).json({
+                error: "OPENROUTER_API_KEY is not configured on server."
+            });
+        }
 
         memory.conversation.push({
-
             role: "user",
-
-            content: message
-
+            content: userMessage,
+            time: new Date().toISOString()
         });
 
-
-        if (memory.conversation.length > 60) {
-
-            memory.conversation =
-                memory.conversation.slice(-60);
-        }
-
-
-        const memoryContext =
-            buildMemoryContext(memory);
-
-
-        const recentConversation =
-            memory.conversation.slice(-10);
-
-
-        // ==================================
-        // WEB SEARCH
-        // ==================================
-
-        let webContext = "";
-
-
-        if (needsWebSearch(message)) {
-
-            console.log(
-                "Tavily search:",
-                message
-            );
-
-
-            webContext =
-                await searchTavily(message);
-        }
-
-
-        // ==================================
-        // AI MESSAGES
-        // ==================================
-
         const messages = [
-
             {
-
                 role: "system",
-
                 content: `
-You are MyAI, a helpful personal AI assistant.
+You are MYAI, a helpful AI assistant.
 
-Your name is MyAI.
+Your founder is Saurabh.
 
-Remember the user's stored information.
+Be helpful, accurate and friendly.
+Reply in the same language/style the user uses.
+If the user speaks Hindi/Hinglish, reply in Hindi/Hinglish.
+If the user speaks English, reply in English.
 
-If asked "Mera naam kya hai?",
-answer using the stored user's name.
+User name:
+${memory.userName || "Not known"}
 
-If asked who created, built, founded, owns,
-or made MyAI, answer using the stored
-founder/owner name.
-
-New Chat does not delete permanent memory.
-
-IMPORTANT:
-Never invent a user's name or founder name.
-If the information is not stored, say that
-you do not have that information.
-
-LANGUAGE RULES:
-
-English input = English.
-
-Hindi input = Hindi.
-
-Roman Hindi/Hinglish = Roman Hinglish.
-
-Do not randomly switch languages.
-
-WEB SEARCH RULES:
-
-If TAVILY WEB SEARCH RESULTS are provided,
-use them as additional information.
-
-Do not claim search results are your own knowledge.
-
-If the search results are insufficient,
-clearly say that the available search information
-is limited.
-
-When appropriate, mention the source.
-
-USER MEMORY:
-${memoryContext}
-
-${webContext}
+Remember useful information from the conversation.
 `
             },
-
-
-            ...recentConversation.map(item => ({
-
-                role:
-                    item.role === "assistant"
-                        ? "assistant"
-                        : "user",
-
+            ...memory.conversation.slice(-20).map(item => ({
+                role: item.role,
                 content: item.content
-
             }))
-
         ];
 
-
-        // ==================================
-        // STREAM RESPONSE HEADERS
-        // ==================================
-
-        res.setHeader(
-            "Content-Type",
-            "text/event-stream"
+        const response = await fetch(
+            "https://openrouter.ai/api/v1/chat/completions",
+            {
+                method: "POST",
+                headers: {
+                    "Authorization":
+                        `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer":
+                        "https://myai-2-wkxz.onrender.com",
+                    "X-Title": "MYAI"
+                },
+                body: JSON.stringify({
+                  model: "nvidia/nemotron-3.5-lightning:free",
+                    messages: messages
+                })
+            }
         );
 
-        res.setHeader(
-            "Cache-Control",
-            "no-cache, no-transform"
-        );
+        const data = await response.json();
 
-        res.setHeader(
-            "Connection",
-            "keep-alive"
-        );
+        if (!response.ok) {
+            console.log("OpenRouter error:", data);
 
-        res.setHeader(
-            "X-Accel-Buffering",
-            "no"
-        );
-
-
-        res.flushHeaders();
-
-
-        // ==================================
-        // OPENROUTER
-        // ==================================
-
-        const apiKey =
-            process.env.OPENROUTER_API_KEY;
-
-
-        if (!apiKey) {
-
-            return res.end(
-                `data: ${JSON.stringify({
-                    error:
-                        "OPENROUTER_API_KEY nahi mila."
-                })}\n\n`
-            );
+            return res.status(response.status).json({
+                error:
+                    data?.error?.message ||
+                    "OpenRouter request failed."
+            });
         }
 
-
-        const response = await axios.post(
-
-            "https://openrouter.ai/api/v1/chat/completions",
-
-            {
-
-                model: "openrouter/free",
-
-                messages: messages,
-
-                temperature: 0.3,
-
-                stream: true
-
-            },
-
-            {
-
-                responseType: "stream",
-
-                headers: {
-
-                    "Authorization":
-                        `Bearer ${apiKey}`,
-
-                    "Content-Type":
-                        "application/json",
-
-                    "HTTP-Referer":
-                        "http://localhost:3000",
-
-                    "X-Title":
-                        "MyAI"
-
-                }
-
-            }
-
-        );
-
-
-        // ==================================
-        // RECEIVE STREAM
-        // ==================================
-
-        let fullReply = "";
-
-        let buffer = "";
-
-
-        response.data.on(
-            "data",
-            (chunk) => {
-
-                buffer +=
-                    chunk.toString();
-
-
-                const lines =
-                    buffer.split("\n");
-
-
-                buffer =
-                    lines.pop() || "";
-
-
-                for (const line of lines) {
-
-                    const trimmed =
-                        line.trim();
-
-
-                    if (!trimmed) {
-                        continue;
-                    }
-
-
-                    if (
-                        !trimmed.startsWith("data:")
-                    ) {
-                        continue;
-                    }
-
-
-                    const data =
-                        trimmed
-                            .slice(5)
-                            .trim();
-
-
-                    if (data === "[DONE]") {
-                        continue;
-                    }
-
-
-                    try {
-
-                        const json =
-                            JSON.parse(data);
-
-
-                        const text =
-                            json.choices?.[0]
-                                ?.delta
-                                ?.content || "";
-
-
-                        if (text) {
-
-                            fullReply += text;
-
-
-                            res.write(
-                                `data: ${JSON.stringify({
-                                    text: text
-                                })}\n\n`
-                            );
-
-                        }
-
-                    } catch (error) {
-
-                        // Ignore incomplete chunks
-
-                    }
-
-                }
-
-            }
-        );
-
-
-        // ==================================
-        // STREAM FINISHED
-        // ==================================
-
-        response.data.on(
-            "end",
-            () => {
-
-                memory.conversation.push({
-
-                    role: "assistant",
-
-                    content:
-                        fullReply ||
-                        "MyAI se response nahi mila."
-
-                });
-
-
-                if (
-                    memory.conversation.length > 60
-                ) {
-
-                    memory.conversation =
-                        memory.conversation
-                            .slice(-60);
-                }
-
-
-                saveMemory(memory);
-
-
-                res.write(
-                    `data: ${JSON.stringify({
-                        done: true
-                    })}\n\n`
-                );
-
-
-                res.end();
-
-            }
-        );
-
-
-        // ==================================
-        // STREAM ERROR
-        // ==================================
-
-        response.data.on(
-            "error",
-            (error) => {
-
-                console.log(
-                    "STREAM ERROR:",
-                    error.message
-                );
-
-
-                if (!res.writableEnded) {
-
-                    res.write(
-                        `data: ${JSON.stringify({
-                            error:
-                                "Streaming error aa gaya."
-                        })}\n\n`
-                    );
-
-
-                    res.end();
-                }
-
-            }
-        );
-
+        const reply =
+            data?.choices?.[0]?.message?.content ||
+            "Sorry, mujhe response nahi mila.";
+
+        memory.conversation.push({
+            role: "assistant",
+            content: reply,
+            time: new Date().toISOString()
+        });
+
+        saveMemory();
+
+        res.json({
+            reply
+        });
 
     } catch (error) {
+        console.log("Chat error:", error);
 
-        console.log(
-            "AI ERROR:",
-            error.response?.data ||
-            error.message
-        );
-
-
-        if (!res.headersSent) {
-
-            res.status(500).json({
-
-                reply:
-                    "MyAI mein error aa gaya. Termux mein error check karo."
-
-            });
-
-        } else {
-
-            res.write(
-                `data: ${JSON.stringify({
-                    error:
-                        "MyAI mein error aa gaya."
-                })}\n\n`
-            );
-
-            res.end();
-
-        }
-
+        res.status(500).json({
+            error: "Server error: " + error.message
+        });
     }
-
 });
 
-
-// ==========================================
-// START SERVER
-// ==========================================
-
+// Render port
 const PORT = process.env.PORT || 3000;
 
-app.listen(
-
-    PORT,
-
-    "0.0.0.0",
-
-    () => {
-
-        console.log(
-            `MyAI Backend running on port ${PORT}`
-        );
-
-    }
-
-);
-
+app.listen(PORT, "0.0.0.0", () => {
+    console.log(`MyAI Backend running on port ${PORT}`);
+});
