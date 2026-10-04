@@ -2,189 +2,215 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
 <title>MYAI</title>
 
 <style>
 * {
     box-sizing: border-box;
+}
+
+html,
+body {
     margin: 0;
     padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0b0f14;
+    color: white;
+    font-family: Arial, sans-serif;
 }
 
 body {
-    font-family: Arial, sans-serif;
-    background: #0f172a;
-    color: white;
-    height: 100vh;
-    overflow: hidden;
-}
-
-.app {
-    height: 100vh;
     display: flex;
     flex-direction: column;
 }
 
 /* Header */
-.header {
+header {
+    flex: 0 0 auto;
     height: 60px;
-    background: #111827;
-    border-bottom: 1px solid #263244;
+    min-height: 60px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 15px;
+    padding: 0 14px;
+    background: #111821;
+    border-bottom: 1px solid #27313d;
 }
 
 .logo {
-    font-size: 22px;
+    font-size: 21px;
     font-weight: bold;
 }
 
 .new-chat {
     border: none;
-    background: #2563eb;
+    background: #202b38;
     color: white;
-    padding: 9px 14px;
-    border-radius: 8px;
-    cursor: pointer;
+    padding: 9px 12px;
+    border-radius: 9px;
+    font-size: 13px;
 }
 
-/* Chat */
-.chat-box {
-    flex: 1;
+/* Main chat area */
+#chatBox {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
     overflow-y: auto;
-    padding: 18px;
-}
-
-.message {
-    max-width: 85%;
-    margin-bottom: 14px;
-    padding: 12px 14px;
-    border-radius: 14px;
-    line-height: 1.5;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-}
-
-.user {
-    background: #2563eb;
-    margin-left: auto;
-    border-bottom-right-radius: 4px;
-}
-
-.ai {
-    background: #1e293b;
-    margin-right: auto;
-    border-bottom-left-radius: 4px;
+    overflow-x: hidden;
+    padding: 15px 12px 20px;
+    -webkit-overflow-scrolling: touch;
 }
 
 .welcome {
-    text-align: center;
-    margin-top: 25vh;
-    color: #cbd5e1;
-}
-
-.welcome h1 {
-    font-size: 32px;
-    margin-bottom: 10px;
-}
-
-/* Input area */
-.input-area {
-    padding: 10px;
-    background: #111827;
-    border-top: 1px solid #263244;
-}
-
-.input-box {
+    min-height: 100%;
     display: flex;
-    gap: 8px;
-    max-width: 900px;
-    margin: auto;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #aeb8c4;
+    font-size: 17px;
+    padding: 20px;
+}
+
+.message {
+    width: 100%;
+    margin: 10px 0;
+    display: flex;
+}
+
+.message.user {
+    justify-content: flex-end;
+}
+
+.message.ai {
+    justify-content: flex-start;
+}
+
+.bubble {
+    max-width: 88%;
+    padding: 11px 13px;
+    border-radius: 14px;
+    line-height: 1.45;
+    font-size: 15px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.user .bubble {
+    background: #2563eb;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.ai .bubble {
+    background: #18212b;
+    color: #f1f5f9;
+    border-bottom-left-radius: 4px;
+}
+
+.listen-btn {
+    display: block;
+    margin-top: 7px;
+    border: none;
+    background: #273443;
+    color: white;
+    padding: 6px 9px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+/* Typing */
+.typing {
+    color: #9ca8b5;
+    font-size: 13px;
+    padding: 5px 3px;
+}
+
+/* Bottom input area */
+.input-area {
+    flex: 0 0 auto;
+    width: 100%;
+    background: #111821;
+    border-top: 1px solid #27313d;
+    padding: 8px 9px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+.input-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 7px;
 }
 
 #userInput {
     flex: 1;
     min-width: 0;
-    padding: 13px;
-    border: 1px solid #334155;
-    border-radius: 12px;
-    background: #0f172a;
-    color: white;
+    height: 45px;
+    border: 1px solid #303c49;
     outline: none;
-    font-size: 16px;
-}
-
-#userInput:focus {
-    border-color: #2563eb;
-}
-
-button {
-    font-size: 18px;
-}
-
-.icon-btn {
-    width: 48px;
-    border: none;
     border-radius: 12px;
-    background: #334155;
+    background: #18212b;
     color: white;
-    cursor: pointer;
+    padding: 0 12px;
+    font-size: 15px;
 }
 
-.send-btn {
-    width: 55px;
+#userInput::placeholder {
+    color: #7f8b98;
+}
+
+.action-btn {
+    flex: 0 0 auto;
+    width: 43px;
+    height: 43px;
     border: none;
-    border-radius: 12px;
+    border-radius: 11px;
+    color: white;
+    font-size: 19px;
+    background: #253140;
+}
+
+#sendButton {
     background: #2563eb;
-    color: white;
-    cursor: pointer;
 }
 
-.icon-btn:hover,
-.send-btn:hover,
-.new-chat:hover {
-    opacity: 0.85;
+#micButton.listening {
+    background: #dc2626;
 }
 
-.speak-btn {
-    margin-top: 7px;
-    border: none;
-    background: transparent;
-    color: #94a3b8;
-    cursor: pointer;
-    font-size: 14px;
-}
-
-.status {
+/* Status */
+#status {
     text-align: center;
-    font-size: 12px;
-    color: #94a3b8;
-    padding-top: 5px;
+    min-height: 17px;
+    margin-top: 4px;
+    color: #7f8b98;
+    font-size: 11px;
 }
 
-/* Mobile */
-@media (max-width: 600px) {
-    .header {
-        height: 55px;
+/* Small screens */
+@media (max-width: 380px) {
+    header {
+        height: 56px;
+        min-height: 56px;
     }
 
     .logo {
-        font-size: 20px;
+        font-size: 19px;
     }
 
-    .chat-box {
-        padding: 12px;
-    }
-
-    .message {
+    .bubble {
         max-width: 92%;
+        font-size: 14px;
     }
 
-    .welcome h1 {
-        font-size: 28px;
+    #userInput {
+        font-size: 14px;
     }
 }
 </style>
@@ -192,233 +218,302 @@ button {
 
 <body>
 
-<div class="app">
+<header>
+    <div class="logo">🤖 MYAI</div>
+    <button class="new-chat" id="newChatButton">＋ New Chat</button>
+</header>
 
-    <div class="header">
-        <div class="logo">🤖 MYAI</div>
-        <button class="new-chat" id="newChat">🆕 New Chat</button>
+<main id="chatBox">
+    <div class="welcome" id="welcome">
+        <div>
+            <div style="font-size:30px;margin-bottom:10px;">🤖</div>
+            <div>Hi! I'm MYAI.</div>
+            <div style="font-size:13px;margin-top:7px;">
+                Ask me anything...
+            </div>
+        </div>
     </div>
+</main>
 
-    <div class="chat-box" id="chatBox">
+<div class="input-area">
+    <div class="input-row">
 
-        <div class="welcome" id="welcome">
-            <h1>MYAI</h1>
-            <p>How can I help you today?</p>
-        </div>
+        <button
+            class="action-btn"
+            id="micButton"
+            type="button"
+            aria-label="Microphone">
+            🎤
+        </button>
 
-    </div>
+        <input
+            id="userInput"
+            type="text"
+            placeholder="Message MYAI..."
+            autocomplete="off"
+            autocorrect="on"
+            spellcheck="true">
 
-    <div class="input-area">
-
-        <div class="input-box">
-
-            <button
-                class="icon-btn"
-                id="micButton"
-                title="Voice Input">
-                🎤
-            </button>
-
-            <input
-                id="userInput"
-                type="text"
-                placeholder="Message MYAI..."
-                autocomplete="off"
-            >
-
-            <button
-                class="send-btn"
-                id="sendButton"
-                title="Send">
-                ➤
-            </button>
-
-        </div>
-
-        <div class="status" id="status">
-            MYAI is ready
-        </div>
+        <button
+            class="action-btn"
+            id="sendButton"
+            type="button"
+            aria-label="Send">
+            ➤
+        </button>
 
     </div>
 
+    <div id="status"></div>
 </div>
 
 <script>
-
 const chatBox = document.getElementById("chatBox");
 const userInput = document.getElementById("userInput");
 const sendButton = document.getElementById("sendButton");
 const micButton = document.getElementById("micButton");
-const newChat = document.getElementById("newChat");
-const welcome = document.getElementById("welcome");
+const newChatButton = document.getElementById("newChatButton");
 const statusText = document.getElementById("status");
+const welcome = document.getElementById("welcome");
 
 let recognition = null;
 let isListening = false;
+let isSending = false;
 
-/* Add message */
+/* -------------------------
+   ADD MESSAGE
+------------------------- */
+
 function addMessage(text, type) {
 
     if (welcome) {
-        welcome.style.display = "none";
+        welcome.remove();
     }
 
     const message = document.createElement("div");
     message.className = "message " + type;
 
-    const content = document.createElement("div");
-    content.textContent = text;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
 
-    message.appendChild(content);
+    bubble.textContent = text;
 
-    if (type === "ai") {
-
-        const speakButton = document.createElement("button");
-
-        speakButton.className = "speak-btn";
-        speakButton.textContent = "🔊 Listen";
-
-        speakButton.onclick = () => {
-            speakText(text);
-        };
-
-        message.appendChild(speakButton);
-    }
-
+    message.appendChild(bubble);
     chatBox.appendChild(message);
 
     chatBox.scrollTop = chatBox.scrollHeight;
+
+    return bubble;
 }
 
-/* Speak */
+/* -------------------------
+   AI MESSAGE + LISTEN
+------------------------- */
+
+function addAIMessage(text) {
+
+    const bubble = addMessage(text, "ai");
+
+    const listenButton = document.createElement("button");
+    listenButton.className = "listen-btn";
+    listenButton.textContent = "🔊 Listen";
+
+    listenButton.addEventListener("click", function() {
+        speakText(text);
+    });
+
+    bubble.appendChild(document.createElement("br"));
+    bubble.appendChild(listenButton);
+}
+
+/* -------------------------
+   SPEECH
+------------------------- */
+
 function speakText(text) {
 
     if (!("speechSynthesis" in window)) {
-        alert("Text to speech is not supported in this browser.");
         return;
     }
 
-    speechSynthesis.cancel();
+    window.speechSynthesis.cancel();
 
     const speech = new SpeechSynthesisUtterance(text);
 
+    speech.lang = "en-IN";
     speech.rate = 1;
     speech.pitch = 1;
-    speech.volume = 1;
 
-    speechSynthesis.speak(speech);
+    window.speechSynthesis.speak(speech);
 }
 
-/* Send message */
+/* -------------------------
+   SEND MESSAGE
+------------------------- */
+
 async function sendMessage() {
+
+    if (isSending) return;
 
     const message = userInput.value.trim();
 
-    if (!message) {
-        return;
-    }
+    if (!message) return;
+
+    isSending = true;
+    sendButton.disabled = true;
 
     addMessage(message, "user");
 
+    /*
+       IMPORTANT:
+       Remove focus from input immediately.
+       This prevents Android keyboard from
+       automatically reopening after AI reply.
+    */
+    userInput.blur();
+
     userInput.value = "";
 
-    statusText.textContent = "MYAI is thinking...";
+    statusText.textContent = "MYAI is typing...";
 
-    sendButton.disabled = true;
+    const typingMessage = document.createElement("div");
+    typingMessage.className = "message ai";
+    typingMessage.id = "typingMessage";
+
+    const typingBubble = document.createElement("div");
+    typingBubble.className = "bubble typing";
+    typingBubble.textContent = "Typing...";
+
+    typingMessage.appendChild(typingBubble);
+    chatBox.appendChild(typingMessage);
+
+    chatBox.scrollTop = chatBox.scrollHeight;
 
     try {
 
         const response = await fetch("/chat", {
-
             method: "POST",
-
             headers: {
                 "Content-Type": "application/json"
             },
-
             body: JSON.stringify({
                 message: message
             })
-
         });
 
         const data = await response.json();
 
-        if (!response.ok) {
+        const oldTyping = document.getElementById("typingMessage");
 
-            throw new Error(
-                data.error || "Server error"
-            );
+        if (oldTyping) {
+            oldTyping.remove();
         }
 
-        addMessage(
-            data.reply || "No response received.",
-            "ai"
-        );
+        if (!response.ok) {
 
-        statusText.textContent = "MYAI is ready";
+            addAIMessage(
+                data.error ||
+                data.message ||
+                "Sorry, something went wrong."
+            );
+
+        } else {
+
+            const reply =
+                data.reply ||
+                data.message ||
+                "I couldn't generate a reply.";
+
+            addAIMessage(reply);
+        }
 
     } catch (error) {
 
-        console.error(error);
+        const oldTyping = document.getElementById("typingMessage");
 
-        addMessage(
-            "❌ Network Error: " + error.message,
-            "ai"
+        if (oldTyping) {
+            oldTyping.remove();
+        }
+
+        addAIMessage(
+            "Network Error: Please check your connection or server."
         );
-
-        statusText.textContent = "Connection error";
 
     } finally {
 
+        statusText.textContent = "";
+
+        isSending = false;
         sendButton.disabled = false;
 
-        userInput.focus();
+        /*
+           IMPORTANT:
+           Do NOT use userInput.focus() here.
+           That was causing the keyboard to open again.
+        */
+        userInput.blur();
+
+        chatBox.scrollTop = chatBox.scrollHeight;
     }
 }
 
-/* Send button */
-sendButton.addEventListener(
-    "click",
-    sendMessage
-);
+/* -------------------------
+   SEND BUTTON
+------------------------- */
 
-/* Enter key */
-userInput.addEventListener(
-    "keydown",
-    function(event) {
+sendButton.addEventListener("click", function() {
+    sendMessage();
+});
 
-        if (event.key === "Enter") {
-            event.preventDefault();
-            sendMessage();
-        }
+/* -------------------------
+   ENTER KEY
+------------------------- */
 
+userInput.addEventListener("keydown", function(event) {
+
+    if (event.key === "Enter" && !event.shiftKey) {
+
+        event.preventDefault();
+
+        sendMessage();
     }
-);
+});
 
-/* New chat */
-newChat.addEventListener(
-    "click",
-    function() {
+/* -------------------------
+   NEW CHAT
+------------------------- */
 
-        chatBox.innerHTML = `
-            <div class="welcome" id="welcome">
-                <h1>MYAI</h1>
-                <p>How can I help you today?</p>
+newChatButton.addEventListener("click", function() {
+
+    window.speechSynthesis?.cancel();
+
+    chatBox.innerHTML = `
+        <div class="welcome" id="welcome">
+            <div>
+                <div style="font-size:30px;margin-bottom:10px;">🤖</div>
+                <div>Hi! I'm MYAI.</div>
+                <div style="font-size:13px;margin-top:7px;">
+                    Ask me anything...
+                </div>
             </div>
-        `;
+        </div>
+    `;
 
-        userInput.value = "";
+    userInput.value = "";
 
-        statusText.textContent =
-            "New chat started";
+    /*
+       Make sure keyboard does not open
+       after New Chat.
+    */
+    userInput.blur();
 
-        userInput.focus();
+    statusText.textContent = "";
+});
 
-    }
-);
+/* -------------------------
+   SPEECH RECOGNITION
+------------------------- */
 
-/* Voice recognition */
 const SpeechRecognition =
     window.SpeechRecognition ||
     window.webkitSpeechRecognition;
@@ -428,20 +523,17 @@ if (SpeechRecognition) {
     recognition = new SpeechRecognition();
 
     recognition.lang = "en-IN";
-
     recognition.continuous = false;
-
     recognition.interimResults = false;
 
     recognition.onstart = function() {
 
         isListening = true;
 
-        micButton.textContent = "🔴";
+        micButton.classList.add("listening");
+        micButton.textContent = "⏹️";
 
-        statusText.textContent =
-            "Listening...";
-
+        statusText.textContent = "Listening...";
     };
 
     recognition.onresult = function(event) {
@@ -451,73 +543,55 @@ if (SpeechRecognition) {
 
         userInput.value = transcript;
 
-        statusText.textContent =
-            "Voice received";
-
+        statusText.textContent = "";
     };
 
-    recognition.onerror = function(event) {
-
-        console.log(
-            "Speech error:",
-            event.error
-        );
+    recognition.onerror = function() {
 
         statusText.textContent =
-            "Mic error";
+            "Microphone error";
 
+        isListening = false;
+
+        micButton.classList.remove("listening");
+        micButton.textContent = "🎤";
     };
 
     recognition.onend = function() {
 
         isListening = false;
 
+        micButton.classList.remove("listening");
         micButton.textContent = "🎤";
 
-        if (
-            statusText.textContent ===
-            "Listening..."
-        ) {
-            statusText.textContent =
-                "MYAI is ready";
-        }
-
+        statusText.textContent = "";
     };
 
-    micButton.addEventListener(
-        "click",
-        function() {
+    micButton.addEventListener("click", function() {
 
-            if (isListening) {
+        if (isListening) {
 
-                recognition.stop();
+            recognition.stop();
 
-            } else {
+        } else {
 
+            try {
                 recognition.start();
-
+            } catch (error) {
+                console.log(error);
             }
-
         }
-    );
+    });
 
 } else {
 
-    micButton.addEventListener(
-        "click",
-        function() {
+    micButton.addEventListener("click", function() {
 
-            alert(
-                "Voice recognition is not supported in this browser."
-            );
+        statusText.textContent =
+            "Speech recognition is not supported in this browser.";
 
-        }
-    );
-
+    });
 }
-
-userInput.focus();
-
 </script>
 
 </body>
