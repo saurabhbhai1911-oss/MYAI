@@ -268,8 +268,6 @@ header {
 </div>
 
 <script>
-const userId = localStorage.getItem("myai_user_id") || crypto.randomUUID();
-localStorage.setItem("myai_user_id", userId);
 const chatBox = document.getElementById("chatBox");
 const userInput = document.getElementById("userInput");
 const sendButton = document.getElementById("sendButton");
@@ -392,17 +390,17 @@ async function sendMessage() {
     chatBox.scrollTop = chatBox.scrollHeight;
 
     try {
-              
-           const response = await fetch("/chat", {
-    method: "POST",
-    headers: {
-        "Content-Type": "application/json",
-        "x-user-id": userId
-    },
-    body: JSON.stringify({
-        message: message
-    })
-});
+
+        const response = await fetch("/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                message: message
+            })
+        });
+
         const data = await response.json();
 
         const oldTyping = document.getElementById("typingMessage");

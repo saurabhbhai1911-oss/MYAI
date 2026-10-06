@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyAI - AI Assistant</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f7f7f8;
+    color: #222;
+}
+
+.header {
+    height: 105px;
+    background: #343541;
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    position: relative;
+}
+
+.logo {
+    font-size: 38px;
+    margin-right: 12px;
+}
+
+.title {
+    font-size: 25px;
+    font-weight: bold;
+}
+
+.menu {
+    margin-left: auto;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+#chat {
+    height: calc(100vh - 205px);
+    overflow-y: auto;
+    padding: 20px 15px 100px;
+}
+
+.message {
+    display: flex;
+    margin: 12px 0;
+}
+
+.message.user {
+    justify-content: flex-end;
+}
+
+.bubble {
+    max-width: 85%;
+    padding: 12px 15px;
+    border-radius: 15px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.user .bubble {
+    background: #343541;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.ai .bubble {
+    background: white;
+    color: #222;
+    border: 1px solid #ddd;
+    border-bottom-left-radius: 4px;
+}
+
+.welcome {
+    text-align: center;
+    margin-top: 80px;
+    color: #666;
+}
+
+.welcome h2 {
+    color: #333;
+}
+
+.bottom {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #f7f7f8;
+    border-top: 1px solid #ddd;
+    padding: 10px 12px 15px;
+}
+
+.input-row {
+    display: flex;
+    gap: 10px;
+    max-width: 800px;
+    margin: auto;
+}
+
+button {
+    border: none;
+    cursor: pointer;
+}
+
+.mic,
+.send {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    font-size: 25px;
+    flex-shrink: 0;
+}
+
+.mic {
+    background: #343541;
+    color: white;
+}
+
+.send {
+    background: #343541;
+    color: white;
+    font-size: 30px;
+}
+
+.send:disabled {
+    opacity: 0.5;
+}
+
+#messageInput {
+    flex: 1;
+    height: 58px;
+    border: 1px solid #ccc;
+    border-radius: 18px;
+    padding: 0 18px;
+    font-size: 17px;
+    outline: none;
+    background: white;
+}
+
+#messageInput:focus {
+    border-color: #777;
+}
+
+.status {
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+    margin-top: 6px;
+}
+
+.typing {
+    font-style: italic;
+    color: #777;
+}
+
+.side-menu {
+    display: none;
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 260px;
+    height: 100%;
+    background: white;
+    z-index: 100;
+    box-shadow: -3px 0 10px rgba(0,0,0,.2);
+    padding: 20px;
+}
+
+.side-menu button {
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    background: #343541;
+    color: white;
+    font-size: 16px;
+}
+
+.close {
+    background: #ddd !important;
+    color: #222 !important;
+}
+
+@media(max-width:600px) {
+    .header {
+        height: 105px;
+    }
+
+    .title {
+        font-size: 22px;
+    }
+
+    #chat {
+        height: calc(100vh - 205px);
+    }
+
+    .bubble {
+        max-width: 90%;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <div class="logo">🤖</div>
+    <div class="title">MyAI - AI Assistant</div>
+    <div class="menu" onclick="openMenu()">⋮</div>
+</div>
+
+<div id="chat">
+
+    <div class="welcome" id="welcome">
+        <h2>Welcome to MyAI 👋</h2>
+        <p>Your personal AI Assistant</p>
+        <p>Ask me anything.</p>
+    </div>
+
+</div>
+
+<div class="bottom">
+
+    <div class="input-row">
+
+        <button class="mic" onclick="startVoice()" title="Voice">
+            🎤
+        </button>
+
+        <input
+            id="messageInput"
+            type="text"
+            placeholder="Message MyAI..."
+            autocomplete="off"
+        >
+
+        <button
+            class="send"
+            id="sendButton"
+            onclick="sendMessage()"
+            title="Send"
+        >
+            ➤
+        </button>
+
+    </div>
+
+    <div class="status" id="status">
+        MyAI can make mistakes. Check important information.
+    </div>
+
+</div>
+
+<div class="side-menu" id="sideMenu">
+
+    <h2>MyAI</h2>
+
+    <button onclick="newChat()">
+        🆕 New Chat
+    </button>
+
+    <button onclick="showMemory()">
+        🧠 Memory
+    </button>
+
+    <button onclick="showAbout()">
+        ℹ️ About MyAI
+    </button>
+
+    <button class="close" onclick="closeMenu()">
+        ✕ Close
+    </button>
+
+</div>
+
+<script>
+
+const input = document.getElementById("messageInput");
+const chat = document.getElementById("chat");
+const sendButton = document.getElementById("sendButton");
+const statusText = document.getElementById("status");
+
+let messages = [];
+
+
+// ===============================
+// ENTER KEY
+// ===============================
+
+input.addEventListener("keydown", function(event) {
+
+    if (event.key === "Enter") {
+        event.preventDefault();
+        sendMessage();
+    }
+
+});
+
+
+// ===============================
+// ADD MESSAGE
+// ===============================
+
+function addMessage(text, type) {
+
+    const welcome = document.getElementById("welcome");
+
+    if (welcome) {
+        welcome.remove();
+    }
+
+    const message = document.createElement("div");
+
+    message.className = "message " + type;
+
+    const bubble = document.createElement("div");
+
+    bubble.className = "bubble";
+
+    bubble.textContent = text;
+
+    message.appendChild(bubble);
+
+    chat.appendChild(message);
+
+    chat.scrollTop = chat.scrollHeight;
+
+}
+
+
+// ===============================
+// SEND MESSAGE
+// ===============================
+
+async function sendMessage() {
+
+    const text = input.value.trim();
+
+    if (!text) {
+        return;
+    }
+
+    addMessage(text, "user");
+
+    input.value = "";
+
+    sendButton.disabled = true;
+
+    statusText.innerHTML =
+        '<span class="typing">MyAI is thinking...</span>';
+
+    messages.push({
+        role: "user",
+        content: text
+    });
+
+    try {
+
+        const response = await fetch("/api/chat", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                message: text
+            })
+
+        });
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Server error: " + response.status
+            );
+
+        }
+
+
+        const data = await response.json();
+
+
+        let reply =
+            data.reply ||
+            data.message ||
+            data.response ||
+            data.answer;
+
+
+        if (!reply) {
+
+            reply =
+                "I received the request, but the server did not return a reply.";
+
+        }
+
+
+        add
