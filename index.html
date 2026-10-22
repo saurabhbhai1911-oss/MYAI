@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
-<title>MYAI</title>
+<title>SaurXai</title>
 
 <style>
 * {
@@ -213,21 +213,116 @@ header {
         font-size: 14px;
     }
 }
+/* SaurXai authentication screen */
+#authScreen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #0b0f14;
+}
+
+#authCard {
+    width: 100%;
+    max-width: 360px;
+    padding: 24px;
+    border: 1px solid #303c49;
+    border-radius: 16px;
+    background: #111821;
+}
+
+#authCard h2 {
+    margin-top: 0;
+    text-align: center;
+}
+
+#authCard p {
+    color: #aeb8c4;
+    text-align: center;
+    font-size: 14px;
+}
+
+#authCard input,
+#authCard button {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 9px;
+    font-size: 15px;
+}
+
+#authCard input {
+    color: white;
+    background: #18212b;
+    border: 1px solid #303c49;
+}
+
+#authCard button {
+    color: white;
+    background: #2563eb;
+    border: none;
+}
+
+#authToggle {
+    background: #253140 !important;
+}
+
+#authStatus {
+    overflow-wrap: anywhere;
+}
 </style>
 </head>
 
 <body>
+<div id="authScreen">
+    <div id="authCard">
+        <h2>🤖 SaurXai</h2>
+        <p>Your Mind. Your AI.</p>
+        <p id="authHeading">Login to your account</p>
 
+        <form id="authForm">
+            <input
+                id="authEmail"
+                type="email"
+                placeholder="Email address"
+                autocomplete="email"
+                required>
+
+            <input
+                id="authPassword"
+                type="password"
+                placeholder="Password (minimum 6 characters)"
+                autocomplete="current-password"
+                minlength="6"
+                required>
+
+            <button id="authSubmit" type="submit">
+                Login
+            </button>
+        </form>
+
+        <button id="authToggle" type="button">
+            Create a new account
+        </button>
+
+        <p id="authStatus" aria-live="polite"></p>
+    </div>
+</div>
 <header>
-    <div class="logo">🤖 MYAI</div>
+    <div class="logo">🤖 SaurXai</div>
     <button class="new-chat" id="newChatButton">＋ New Chat</button>
+    <button class="new-chat" id="logoutButton" type="button">Logout</button>
 </header>
 
 <main id="chatBox">
     <div class="welcome" id="welcome">
         <div>
             <div style="font-size:30px;margin-bottom:10px;">🤖</div>
-            <div>Hi! I'm MYAI.</div>
+            <div>Hi! I'm SaurXai.</div>
             <div style="font-size:13px;margin-top:7px;">
                 Ask me anything...
             </div>
@@ -249,7 +344,7 @@ header {
         <input
             id="userInput"
             type="text"
-            placeholder="Message MYAI..."
+            placeholder="Message SaurXai..."
             autocomplete="off"
             autocorrect="on"
             spellcheck="true">
@@ -267,20 +362,169 @@ header {
     <div id="status"></div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-const userId = localStorage.getItem("myai_user_id") || crypto.randomUUID();
-localStorage.setItem("myai_user_id", userId);
+let session = null;
+let supabaseClient = null;
 const chatBox = document.getElementById("chatBox");
 const userInput = document.getElementById("userInput");
 const sendButton = document.getElementById("sendButton");
 const micButton = document.getElementById("micButton");
 const newChatButton = document.getElementById("newChatButton");
+const logoutButton = document.getElementById("logoutButton");
 const statusText = document.getElementById("status");
 const welcome = document.getElementById("welcome");
 
 let recognition = null;
 let isListening = false;
 let isSending = false;
+
+const authScreen = document.getElementById("authScreen");
+const authForm = document.getElementById("authForm");
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authSubmit = document.getElementById("authSubmit");
+const authToggle = document.getElementById("authToggle");
+const authHeading = document.getElementById("authHeading");
+const authStatus = document.getElementById("authStatus");
+
+logoutButton.addEventListener("click", async function () {
+    if (!supabaseClient) return;
+    logoutButton.disabled = true;
+    try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        session = null;
+        authScreen.style.display = "flex";
+        authStatus.textContent = "You have logged out successfully.";
+    } catch (error) {
+        statusText.textContent = "Logout failed: " + error.message;
+    } finally {
+        logoutButton.disabled = false;
+    }
+});
+
+
+let isSignUpMode = false;
+
+authScreen.style.display = "flex";
+
+authToggle.addEventListener("click", function () {
+    isSignUpMode = !isSignUpMode;
+
+    authHeading.textContent = isSignUpMode
+        ? "Create your SaurXai account"
+        : "Login to your account";
+
+    authSubmit.textContent = isSignUpMode
+        ? "Create Account"
+        : "Login";
+
+    authToggle.textContent = isSignUpMode
+        ? "Already have an account? Login"
+        : "Create a new account";
+
+    authPassword.autocomplete = isSignUpMode
+        ? "new-password"
+        : "current-password";
+
+    authStatus.textContent = "";
+});
+
+async function initializeSupabaseAuth() {
+    try {
+        const response = await fetch("/auth-config");
+        const config = await response.json();
+
+        if (!response.ok) {
+            throw new Error(config.error || "Could not load login settings.");
+        }
+
+        if (!window.supabase || !window.supabase.createClient) {
+            throw new Error("Supabase library did not load. Check your internet connection.");
+        }
+
+        supabaseClient = window.supabase.createClient(
+            config.url,
+            config.publishableKey
+        );
+
+        const { data, error } = await supabaseClient.auth.getSession();
+
+        if (error) throw error;
+
+        session = data.session;
+
+        authScreen.style.display = session ? "none" : "flex";
+
+        supabaseClient.auth.onAuthStateChange(function (event, newSession) {
+            session = newSession;
+            authScreen.style.display = session ? "none" : "flex";
+        });
+
+    } catch (error) {
+        authScreen.style.display = "flex";
+        authStatus.textContent = error.message;
+    }
+}
+
+authForm.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    if (!supabaseClient) {
+        authStatus.textContent = "Login is still loading. Please try again.";
+        return;
+    }
+
+    authSubmit.disabled = true;
+    authStatus.textContent = "Please wait...";
+
+    try {
+        const email = authEmail.value.trim();
+        const password = authPassword.value;
+
+        if (isSignUpMode) {
+            const { data, error } = await supabaseClient.auth.signUp({
+                email: email,
+                password: password
+            });
+
+            if (error) throw error;
+
+            if (data.session) {
+                session = data.session;
+                authScreen.style.display = "none";
+                authStatus.textContent = "";
+            } else {
+                authStatus.textContent =
+                    "Account created. Check your email to confirm your account, then login.";
+            }
+
+        } else {
+            const { data, error } =
+                await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+            if (error) throw error;
+
+            session = data.session;
+            authScreen.style.display = "none";
+            authStatus.textContent = "";
+        }
+
+    } catch (error) {
+        authStatus.textContent = error.message;
+    } finally {
+        authSubmit.disabled = false;
+    }
+});
+
+initializeSupabaseAuth();
+
+
+
 
 /* -------------------------
    ADD MESSAGE
@@ -376,7 +620,7 @@ async function sendMessage() {
 
     userInput.value = "";
 
-    statusText.textContent = "MYAI is typing...";
+    statusText.textContent = "SaurXai is typing...";
 
     const typingMessage = document.createElement("div");
     typingMessage.className = "message ai";
@@ -397,7 +641,7 @@ async function sendMessage() {
     method: "POST",
     headers: {
         "Content-Type": "application/json",
-        "x-user-id": userId
+         "Authorization": `Bearer ${session.access_token}`
     },
     body: JSON.stringify({
         message: message
@@ -493,7 +737,7 @@ newChatButton.addEventListener("click", function() {
         <div class="welcome" id="welcome">
             <div>
                 <div style="font-size:30px;margin-bottom:10px;">🤖</div>
-                <div>Hi! I'm MYAI.</div>
+                <div>Hi! I'm SaurXai.</div>
                 <div style="font-size:13px;margin-top:7px;">
                     Ask me anything...
                 </div>

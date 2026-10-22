@@ -1,430 +1,475 @@
 const express = require("express");
-const dotenv = require("dotenv");
-const fs = require("fs");
 const cors = require("cors");
+const axios = require("axios");
+const fs = require("fs");
 const path = require("path");
+require("dotenv").config();
+const { createClient } = require("@supabase/supabase-js");
 
-dotenv.config();
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
 
+const supabase = createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+);
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: "1mb" }));
-
-// ===============================
-// FRONTEND
-// ===============================
+app.use(express.json({ limit: "10mb" }));
 app.use(express.static(__dirname));
 
-// ===============================
-// USER MEMORY
-// ===============================
+const PORT = process.env.PORT || 3000;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 
-// All users' memories are stored separately by userId.
-// This file is blocked from public access below.
-const usersMemoryFile = path.join(__dirname, "users-memory.json");
+const memoryFile = path.join(__dirname, "memory.json");
 
-let usersMemory = {};
+// ================= MEMORY =================
 
-try {
-    if (fs.existsSync(usersMemoryFile)) {
-        const saved = fs.readFileSync(usersMemoryFile, "utf8");
-
-        if (saved.trim()) {
-            usersMemory = JSON.parse(saved);
+function loadMemory() {
+    try {
+        if (fs.existsSync(memoryFile)) {
+            return JSON.parse(fs.readFileSync(memoryFile, "utf8"));
         }
+    } catch (error) {
+        console.log("Memory read error:", error.message);
     }
-} catch (error) {
-    console.log("User memory load error:", error.message);
-    usersMemory = {};
+
+    return {
+        userName: "",
+        founderName: "Saurabh",
+        preferences: [],
+        facts: [],
+        importantInfo: [],
+        conversation: []
+    };
 }
 
-// Save all user memories
-function saveUsersMemory() {
+function saveMemory(memory) {
     try {
         fs.writeFileSync(
-            usersMemoryFile,
-            JSON.stringify(usersMemory, null, 2),
+            memoryFile,
+            JSON.stringify(memory, null, 2),
             "utf8"
         );
     } catch (error) {
-        console.log("User memory save error:", error.message);
+        console.log("Memory save error:", error.message);
+    }
+}
+async function loadUserMemory(userId, userSupabase) {
+    const { data, error } = await userSupabase
+        .from("user_memories")
+        .select("memory")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+    if (error) {
+        throw new Error("Private memory load failed: " + error.message);
+    }
+
+    if (data && data.memory) {
+        return data.memory;
+    }
+
+    const defaultMemory = {
+        userName: "",
+        founderName: "Saurabh",
+        preferences: [],
+        facts: [],
+        importantInfo: [],
+        conversation: []
+    };
+
+    const { error: insertError } = await userSupabase
+        .from("user_memories")
+        .insert({
+            user_id: userId,
+            memory: defaultMemory
+        });
+
+    if (insertError) {
+        throw new Error("Private memory create failed: " + insertError.message);
+    }
+
+    return defaultMemory;
+}
+
+async function saveUserMemory(userId, memory, userSupabase) {
+    const { error } = await userSupabase
+        .from("user_memories")
+        .upsert({
+            user_id: userId,
+            memory: memory,
+            updated_at: new Date().toISOString()
+        }, {
+            onConflict: "user_id"
+        });
+
+    if (error) {
+        throw new Error("Private memory save failed: " + error.message);
     }
 }
 
-// Get/create memory for one user
-function getUserMemory(userId) {
-    if (!userId) {
-        return null;
-    }
+function needsWebSearch(message) {
+    const text = message.toLowerCase().trim();
 
-    if (!usersMemory[userId]) {
-        usersMemory[userId] = {
-            userName: null,
-            preferences: [],
-            facts: [],
-            importantInfo: [],
-            conversation: []
-        };
-    }
-
-    return usersMemory[userId];
-}
-
-// ===============================
-// SECURITY
-// ===============================
-
-// Never allow memory files to be opened directly
-app.use((req, res, next) => {
-    const blockedFiles = [
-        "/users-memory.json",
-        "/memory.json",
-        "/memory",
-        "/users-memory"
+    const searchPatterns = [
+        /\blatest news\b/,
+        /\bcurrent news\b/,
+        /\bnews today\b/,
+        /\btoday's news\b/,
+        /\bwhat happened\b/,
+        /\brecent news\b/,
+        /\blatest update\b/,
+        /\bcurrent price\b/,
+        /\bprice today\b/,
+        /\bweather\b/,
+        /\bforecast\b/,
+        /\blive score\b/,
+        /\bstock price\b/,
+        /\bexchange rate\b/,
+        /\bsearch the web\b/,
+        /\bsearch the internet\b/,
+        /\blook up\b/,
+        /\bwho is\b.*\b(today|latest|currently|now)\b/,
+        /\b(today|latest|currently|now)\b.*\b(news|price|update|score)\b/,
+        /आज की खबर/,
+        /ताजा खबर/,
+        /ताज़ा खबर/,
+        /आज का मौसम/,
+        /मौसम कैसा/,
+        /अभी का भाव/,
+        /लेटेस्ट न्यूज़/,
+        /ताज़ा समाचार/,
+        /वेब पर खोज/,
+        /इंटरनेट पर खोज/
     ];
 
-    if (blockedFiles.includes(req.path)) {
-        return res.status(403).json({
-            error: "Access denied"
+    return searchPatterns.some(pattern => pattern.test(text));
+}
+
+
+// ================= WEB SEARCH CHECK =================
+
+
+// ================= TAVILY SEARCH =================
+
+async function searchTavily(query) {
+    if (!TAVILY_API_KEY) {
+        console.log("TAVILY_API_KEY missing");
+        return "";
+    }
+
+    try {
+        const response = await axios.post(
+            "https://api.tavily.com/search",
+            {
+                api_key: TAVILY_API_KEY,
+                query: query,
+                search_depth: "basic",
+                topic: "general",
+                max_results: 5,
+                include_answer: true,
+                include_raw_content: false
+            },
+            {
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                timeout: 10000
+            }
+        );
+
+        const data = response.data;
+
+        let webContext = "";
+
+        if (data.answer) {
+            webContext += `Tavily answer:\n${data.answer}\n\n`;
+        }
+
+        if (Array.isArray(data.results)) {
+            webContext += "Web search results:\n";
+
+            data.results.forEach((result, index) => {
+                webContext += `
+${index + 1}. ${result.title || ""}
+URL: ${result.url || ""}
+Content: ${result.content || ""}
+`;
+            });
+        }
+
+        return webContext;
+
+    } catch (error) {
+        console.log(
+            "Tavily error:",
+            error.response?.data || error.message
+        );
+
+        return "";
+    }
+}
+// ================= SUPABASE PUBLIC CONFIG =================
+
+app.get("/auth-config", (req, res) => {
+    if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+        return res.status(500).json({
+            error: "Supabase configuration is missing"
         });
     }
 
-    next();
+    res.json({
+        url: SUPABASE_URL,
+        publishableKey: SUPABASE_PUBLISHABLE_KEY
+    });
 });
-
-// ===============================
-// HOME
-// ===============================
+// ================= HOME =================
 
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// ===============================
-// HEALTH CHECK
-// ===============================
+// ================= STATUS =================
 
-app.get("/health", (req, res) => {
+app.get("/status", (req, res) => {
     res.json({
         status: "online",
-        message: "MyAI Backend is Running"
+        message: "MyAI Backend is Running",
+        openrouter: !!OPENROUTER_API_KEY,
+        tavily: !!TAVILY_API_KEY
     });
 });
+// ================= SUPABASE AUTH =================
 
-// ===============================
-// GET USER MEMORY
-// ===============================
-
-app.get("/my-memory", (req, res) => {
-    const userId = req.headers["x-user-id"];
-
-    if (!userId) {
-        return res.status(400).json({
-            error: "User ID required"
-        });
-    }
-
-    const memory = getUserMemory(userId);
-
-    res.json({
-        success: true,
-        memory: {
-            userName: memory.userName
-        }
-    });
-});
-
-// ===============================
-// SAVE USER NAME
-// ===============================
-
-app.post("/memory/name", (req, res) => {
-    const userId = req.headers["x-user-id"];
-    const { userName } = req.body;
-
-    if (!userId) {
-        return res.status(400).json({
-            error: "User ID required"
-        });
-    }
-
-    if (!userName || !userName.trim()) {
-        return res.status(400).json({
-            error: "Name required"
-        });
-    }
-
-    const memory = getUserMemory(userId);
-
-    memory.userName = userName.trim();
-
-    saveUsersMemory();
-
-    res.json({
-        success: true,
-        message: "Name saved",
-        userName: memory.userName
-    });
-});
-
-// ===============================
-// NAME DETECTION
-// ===============================
-
-function detectName(message) {
-    const text = message.trim();
-
-    const patterns = [
-        /(?:mera naam|मेरा नाम)\s+([a-zA-Z\u0900-\u097F][a-zA-Z\u0900-\u097F ]{1,30}?)(?:\s+hai|\s+है|$)/i,
-
-        /(?:my name is)\s+([a-zA-Z][a-zA-Z ]{1,30}?)(?:\s+is|\s+hai|$)/i,
-
-        /(?:call me)\s+([a-zA-Z][a-zA-Z ]{1,30}?)(?:\s+please|$)/i,
-
-        /(?:i am|i'm)\s+([a-zA-Z][a-zA-Z ]{1,30}?)(?:\s+and|\s+from|\s+hai|$)/i
-    ];
-
-    for (const pattern of patterns) {
-        const match = text.match(pattern);
-
-        if (match && match[1]) {
-            let name = match[1].trim();
-
-            // Remove common ending words
-            name = name.replace(/\s+(hai|है)$/i, "").trim();
-
-            if (name.length >= 2 && name.length <= 30) {
-                return name;
-            }
-        }
-    }
-
-    return null;
-}
-
-// ===============================
-// FOUNDER CHECK
-// ===============================
-
-function isFounderQuestion(message) {
-    const text = message.toLowerCase();
-
-    return (
-        text.includes("founder") ||
-        text.includes("who made you") ||
-        text.includes("who created you") ||
-        text.includes("who built you") ||
-        text.includes("kisne banaya") ||
-        text.includes("kisne bnaya") ||
-        text.includes("tumhe kisne banaya") ||
-        text.includes("aapko kisne banaya")
-    );
-}
-
-// ===============================
-// AI CHAT
-// ===============================
-
-app.post("/chat", async (req, res) => {
+async function requireAuth(req, res, next) {
     try {
-        const userId = req.headers["x-user-id"];
-        const message = req.body.message;
+        const authHeader = req.headers.authorization || "";
 
-        if (!userId) {
-            return res.status(400).json({
-                error: "User ID required"
+        if (!authHeader.startsWith("Bearer ")) {
+            return res.status(401).json({
+                error: "Please login to use SaurAI."
             });
         }
 
-        if (!message || !message.trim()) {
+        const token = authHeader.slice(7);
+
+        const { data, error } = await supabase.auth.getUser(token);
+
+        if (error || !data.user) {
+            return res.status(401).json({
+                error: "Your session is invalid or expired. Please login again."
+            });
+        }
+
+        req.user = data.user;
+                 req.userSupabase = createClient(
+            SUPABASE_URL,
+            SUPABASE_PUBLISHABLE_KEY,
+            {
+                global: {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                },
+                auth: {
+                    persistSession: false,
+                    autoRefreshToken: false,
+                    detectSessionInUrl: false
+                }
+            }
+        );        
+        next();
+
+    } catch (error) {
+        console.log("Authentication error:", error.message);
+
+        return res.status(401).json({
+            error: "Authentication failed. Please login again."
+        });
+    }
+}
+// ================= CHAT =================
+
+app.post("/chat", requireAuth, async (req, res) => {
+    try {
+        const userMessage = String(req.body.message || "").trim();
+
+        if (!userMessage) {
             return res.status(400).json({
                 error: "Message is required"
             });
         }
 
-        const userMessage = message.trim();
-
-        const memory = getUserMemory(userId);
-
-        // --------------------------------
-        // FOUNDER
-        // --------------------------------
-
-        if (isFounderQuestion(userMessage)) {
-            return res.json({
-                reply: "Mujhe mere founder Saurabh ne banaya hai."
-            });
-        }
-
-        // --------------------------------
-        // NAME MEMORY
-        // --------------------------------
-
-        const detectedName = detectName(userMessage);
-
-        if (detectedName) {
-            memory.userName = detectedName;
-            saveUsersMemory();
-
-            return res.json({
-                reply: `Nice to meet you, ${detectedName}! Main tumhara naam yaad rakhunga.`
-            });
-        }
-
-        // --------------------------------
-        // API KEY CHECK
-        // --------------------------------
-
-        if (!process.env.OPENROUTER_API_KEY) {
+        if (!OPENROUTER_API_KEY) {
             return res.status(500).json({
-                error: "OPENROUTER_API_KEY is not configured on server."
+                error: "OPENROUTER_API_KEY is missing"
             });
         }
 
-        // --------------------------------
-        // SAVE USER MESSAGE
-        // --------------------------------
+        const memory = await loadUserMemory(req.user.id, req.userSupabase);
+        // ---------- NAME MEMORY ----------
+
+        const nameMatch = userMessage.match(
+            /(?:my name is|mera naam|मेरा नाम)\s+([a-zA-Z][a-zA-Z ]{1,30})/i
+        );
+
+        if (nameMatch) {
+            memory.userName = nameMatch[1].trim();
+            await saveUserMemory(req.user.id, memory, req.userSupabase);
+        }
+
+        // ---------- CURRENT DATE/TIME ----------
+
+        const currentDate = new Date().toLocaleString("en-IN", {
+            timeZone: "Asia/Kolkata",
+            dateStyle: "full",
+            timeStyle: "long"
+        });
+
+        // ---------- TAVILY ----------
+
+        let webContext = "";
+
+        if (needsWebSearch(userMessage)) {
+            console.log("Tavily search:", userMessage);
+
+            webContext = await searchTavily(userMessage);
+
+            if (webContext) {
+                console.log("Tavily search successful");
+            } else {
+                console.log("Tavily returned no results");
+            }
+        }
+
+        // ---------- CONVERSATION MEMORY ----------
+
+        memory.conversation = memory.conversation || [];
 
         memory.conversation.push({
             role: "user",
-            content: userMessage,
-            time: new Date().toISOString()
+            content: userMessage
         });
 
-        // Keep only latest 20 messages
         if (memory.conversation.length > 20) {
-            memory.conversation = memory.conversation.slice(-20);
+            memory.conversation =
+                memory.conversation.slice(-20);
         }
 
-        // --------------------------------
-        // SYSTEM PROMPT
-        // --------------------------------
+         await saveUserMemory(req.user.id, memory, req.userSupabase);
 
-        const systemPrompt = `
-You are MYAI, a helpful personal AI assistant.
+        // ---------- SYSTEM PROMPT ----------
 
-Your founder is Saurabh.
+        let systemPrompt = `
+You are SaurXai, a personal AI assistant.
 
-IMPORTANT PRIVACY RULES:
-- Never assume that the current user is Saurabh.
-- Never call a user Saurabh unless that user has explicitly told you their name is Saurabh.
-- Each user has separate memory.
-- Never reveal another user's information, name, conversation, facts, or memory.
-- Only use the memory supplied for the current user.
-- Do not claim to know information that is not in the current user's memory.
+Current Indian date and time:
+${currentDate}
 
-USER INFORMATION:
-Name: ${memory.userName || "Unknown"}
+User name:
+${memory.userName || "Unknown"}
 
-If the user's name is unknown, talk normally without using a name.
+Founder of SaurXai:
+${memory.founderName || "Saurabh"}
 
-Be helpful, accurate and friendly.
-
-If the user speaks Hindi/Hinglish, reply in Hindi/Hinglish.
-If the user speaks English, reply in English.
-Keep the language consistent with the user.
-
-FOUNDER:
-Saurabh is the founder of MYAI.
+Instructions:
+- Answer naturally and helpfully.
+- English input -> English response.
+- Hindi input -> Hindi response.
+- Roman Hindi/Hinglish input -> Roman Hindi/Hinglish response.
+- Do not randomly change language.
+- For study questions, explain simply.
+- Do not invent facts.
+- Use the current date/time above for date and time questions.
 `;
 
-        // --------------------------------
-        // CONVERSATION FOR THIS USER ONLY
-        // --------------------------------
+        // ---------- WEB CONTEXT ----------
+
+        if (webContext) {
+            systemPrompt += `
+
+IMPORTANT:
+The following information was obtained from a live web search using Tavily.
+
+Use it when answering the user's question.
+Prefer the web information for current/latest facts.
+Do not claim that you personally browsed the internet.
+If the web results are uncertain or conflicting, clearly say so.
+
+WEB SEARCH INFORMATION:
+${webContext}
+`;
+        }
 
         const messages = [
             {
                 role: "system",
                 content: systemPrompt
             },
-            ...memory.conversation.slice(-20).map(item => ({
-                role: item.role,
-                content: item.content
-            }))
+            ...memory.conversation
         ];
 
-        // --------------------------------
-        // OPENROUTER
-        // --------------------------------
+        // ---------- OPENROUTER ----------
 
-        const response = await fetch(
+        const response = await axios.post(
             "https://openrouter.ai/api/v1/chat/completions",
             {
-                method: "POST",
+                model: "openrouter/free",
+                messages: messages,
+                temperature: 0.7,
+                max_tokens: 1200
+            },
+            {
                 headers: {
-                    "Authorization":
-                        `Bearer ${process.env.OPENROUTER_API_KEY}`,
-
+                    Authorization: `Bearer ${OPENROUTER_API_KEY}`,
                     "Content-Type": "application/json",
-
-                    "HTTP-Referer":
-                        "https://myai-2-wkxz.onrender.com",
-
-                    "X-Title": "MYAI"
+                    "HTTP-Referer": "https://myai-2-wkxz.onrender.com",
+                    "X-Title": "MyAI"
                 },
-
-                body: JSON.stringify({
-                    model: "nvidia/nemotron-3.5-lightning:free",
-                    messages: messages
-                })
+                timeout: 30000
             }
         );
 
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.log("OpenRouter error:", data);
-
-            return res.status(response.status).json({
-                error:
-                    data?.error?.message ||
-                    "OpenRouter request failed."
-            });
-        }
-
-        // --------------------------------
-        // AI REPLY
-        // --------------------------------
-
         const reply =
-            data?.choices?.[0]?.message?.content ||
-            "Sorry, mujhe abhi reply nahi mila.";
+            response.data?.choices?.[0]?.message?.content ||
+            "Sorry, mujhe abhi response nahi mila.";
 
-        // --------------------------------
-        // SAVE AI REPLY
-        // --------------------------------
+        // ---------- SAVE AI RESPONSE ----------
 
         memory.conversation.push({
             role: "assistant",
-            content: reply,
-            time: new Date().toISOString()
+            content: reply
         });
 
         if (memory.conversation.length > 20) {
-            memory.conversation = memory.conversation.slice(-20);
+            memory.conversation =
+                memory.conversation.slice(-20);
         }
 
-        saveUsersMemory();
-
+          await saveUserMemory(req.user.id, memory, req.userSupabase);
         res.json({
             reply: reply
         });
 
     } catch (error) {
-        console.log("Chat error:", error);
+        console.log(
+            "Chat error:",
+            error.response?.data || error.message
+        );
 
         res.status(500).json({
-            error: "Server error: " + error.message
+            error:
+                error.response?.data?.error?.message ||
+                error.message ||
+                "Something went wrong"
         });
     }
 });
 
-// ===============================
-// RENDER PORT
-// ===============================
-
-const PORT = process.env.PORT || 3000;
+// ================= START SERVER =================
 
 app.listen(PORT, "0.0.0.0", () => {
     console.log(`MyAI Backend running on port ${PORT}`);
