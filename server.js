@@ -17,7 +17,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
-app.use(express.static(__dirname));
+app.use(express.static(__dirname, { index: false }));
 
 const PORT = process.env.PORT || 3000;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -229,7 +229,7 @@ app.get("/auth-config", (req, res) => {
 // ================= HOME =================
 
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "index.html"));
+    res.sendFile(path.join(__dirname, "frontend", "index.html"));
 });
 
 // ================= STATUS =================
