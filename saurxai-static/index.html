@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+<title>SaurXai</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #0b0f14;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+header {
+    flex: 0 0 auto;
+    height: 60px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    background: #111821;
+    border-bottom: 1px solid #27313d;
+}
+
+.logo {
+    font-size: 21px;
+    font-weight: bold;
+}
+
+.new-chat {
+    border: none;
+    background: #202b38;
+    color: white;
+    padding: 9px 12px;
+    border-radius: 9px;
+    font-size: 13px;
+}
+
+/* Main chat area */
+#chatBox {
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 15px 12px 20px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.welcome {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #aeb8c4;
+    font-size: 17px;
+    padding: 20px;
+}
+
+.message {
+    width: 100%;
+    margin: 10px 0;
+    display: flex;
+}
+
+.message.user {
+    justify-content: flex-end;
+}
+
+.message.ai {
+    justify-content: flex-start;
+}
+
+.bubble {
+    max-width: 88%;
+    padding: 11px 13px;
+    border-radius: 14px;
+    line-height: 1.45;
+    font-size: 15px;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.user .bubble {
+    background: #2563eb;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.ai .bubble {
+    background: #18212b;
+    color: #f1f5f9;
+    border-bottom-left-radius: 4px;
+}
+
+.listen-btn {
+    display: block;
+    margin-top: 7px;
+    border: none;
+    background: #273443;
+    color: white;
+    padding: 6px 9px;
+    border-radius: 8px;
+    font-size: 12px;
+}
+
+/* Typing */
+.typing {
+    color: #9ca8b5;
+    font-size: 13px;
+    padding: 5px 3px;
+}
+
+/* Bottom input area */
+.input-area {
+    flex: 0 0 auto;
+    width: 100%;
+    background: #111821;
+    border-top: 1px solid #27313d;
+    padding: 8px 9px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+}
+
+.input-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+#userInput {
+    flex: 1;
+    min-width: 0;
+    height: 45px;
+    border: 1px solid #303c49;
+    outline: none;
+    border-radius: 12px;
+    background: #18212b;
+    color: white;
+    padding: 0 12px;
+    font-size: 15px;
+}
+
+#userInput::placeholder {
+    color: #7f8b98;
+}
+
+.action-btn {
+    flex: 0 0 auto;
+    width: 43px;
+    height: 43px;
+    border: none;
+    border-radius: 11px;
+    color: white;
+    font-size: 19px;
+    background: #253140;
+}
+
+#sendButton {
+    background: #2563eb;
+}
+
+#micButton.listening {
+    background: #dc2626;
+}
+
+/* Status */
+#status {
+    text-align: center;
+    min-height: 17px;
+    margin-top: 4px;
+    color: #7f8b98;
+    font-size: 11px;
+}
+
+/* Small screens */
+@media (max-width: 380px) {
+    header {
+        height: 56px;
+        min-height: 56px;
+    }
+
+    .logo {
+        font-size: 19px;
+    }
+
+    .bubble {
+        max-width: 92%;
+        font-size: 14px;
+    }
+
+    #userInput {
+        font-size: 14px;
+    }
+}
+/* SaurXai authentication screen */
+#authScreen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: #0b0f14;
+}
+
+#authCard {
+    width: 100%;
+    max-width: 360px;
+    padding: 24px;
+    border: 1px solid #303c49;
+    border-radius: 16px;
+    background: #111821;
+}
+
+#authCard h2 {
+    margin-top: 0;
+    text-align: center;
+}
+
+#authCard p {
+    color: #aeb8c4;
+    text-align: center;
+    font-size: 14px;
+}
+
+#authCard input,
+#authCard button {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 9px;
+    font-size: 15px;
+}
+
+#authCard input {
+    color: white;
+    background: #18212b;
+    border: 1px solid #303c49;
+}
+
+#authCard button {
+    color: white;
+    background: #2563eb;
+    border: none;
+}
+
+#authToggle {
+    background: #253140 !important;
+}
+
+#authStatus {
+    overflow-wrap: anywhere;
+}
+</style>
+</head>
+
+<body>
+<div id="saurxaiLoader" style="position:fixed;inset:0;z-index:99999;background:#0b0f14;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:Arial,sans-serif;text-align:center;padding:24px;">
+  <div style="font-size:34px;font-weight:bold;letter-spacing:1px;">SaurXai</div>
+  <div style="color:#9aa8b8;margin-top:10px;">Your Mind. Your AI.</div>
+  <div style="width:34px;height:34px;border:3px solid #263442;border-top-color:#69aaff;border-radius:50%;animation:saurSpin 1s linear infinite;margin-top:28px;"></div>
+  <div id="saurxaiLoaderText" style="color:#c5ced8;margin-top:18px;">Connecting to SaurXai...</div>
+  <style>@keyframes saurSpin{to{transform:rotate(360deg)}}</style>
+</div>
+
+<div id="authScreen">
+    <div id="authCard">
+        <h2>🤖 SaurXai</h2>
+        <p>Your Mind. Your AI.</p>
+        <p id="authHeading">Login to your account</p>
+
+        <form id="authForm">
+            <input
+                id="authEmail"
+                type="email"
+                placeholder="Email address"
+                autocomplete="email"
+                required>
+
+            <input
+                id="authPassword"
+                type="password"
+                placeholder="Password (minimum 6 characters)"
+                autocomplete="current-password"
+                minlength="6"
+                required>
+
+            <button id="authSubmit" type="submit">
+                Login
+            </button>
+        </form>
+
+        <button id="authToggle" type="button">
+            Create a new account
+        </button>
+
+        <p id="authStatus" aria-live="polite"></p>
+    </div>
+</div>
+<header>
+    <div class="logo">🤖 SaurXai</div>
+    <button class="new-chat" id="newChatButton">＋ New Chat</button>
+    <button class="new-chat" id="logoutButton" type="button">Logout</button>
+</header>
+
+<main id="chatBox">
+    <div class="welcome" id="welcome">
+        <div>
+            <div style="font-size:30px;margin-bottom:10px;">🤖</div>
+            <div>Hi! I'm SaurXai.</div>
+            <div style="font-size:13px;margin-top:7px;">
+                Ask me anything...
+            </div>
+        </div>
+    </div>
+</main>
+
+<div class="input-area">
+    <div class="input-row">
+
+        <button
+            class="action-btn"
+            id="micButton"
+            type="button"
+            aria-label="Microphone">
+            🎤
+        </button>
+
+        <input
+            id="userInput"
+            type="text"
+            placeholder="Message SaurXai..."
+            autocomplete="off"
+            autocorrect="on"
+            spellcheck="true">
+
+        <button
+            class="action-btn"
+            id="sendButton"
+            type="button"
+            aria-label="Send">
+            ➤
+        </button>
+
+    </div>
+
+    <div id="status"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+let session = null;
+let supabaseClient = null;
+const chatBox = document.getElementById("chatBox");
+const userInput = document.getElementById("userInput");
+const sendButton = document.getElementById("sendButton");
+const micButton = document.getElementById("micButton");
+const newChatButton = document.getElementById("newChatButton");
+const logoutButton = document.getElementById("logoutButton");
+const statusText = document.getElementById("status");
+const welcome = document.getElementById("welcome");
+
+let recognition = null;
+let isListening = false;
+let isSending = false;
+
+const saurxaiLoader = document.getElementById("saurxaiLoader");
+
+function hideSaurXaiLoader() {
+    if (saurxaiLoader) {
+        saurxaiLoader.style.display = "none";
+    }
+}
+
+const authScreen = document.getElementById("authScreen");
+const authForm = document.getElementById("authForm");
+const authEmail = document.getElementById("authEmail");
+const authPassword = document.getElementById("authPassword");
+const authSubmit = document.getElementById("authSubmit");
+const authToggle = document.getElementById("authToggle");
+const authHeading = document.getElementById("authHeading");
+const authStatus = document.getElementById("authStatus");
+
+logoutButton.addEventListener("click", async function () {
+    if (!supabaseClient) return;
+    logoutButton.disabled = true;
+    try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        session = null;
+        authScreen.style.display = "flex";
+        authStatus.textContent = "You have logged out successfully.";
+    } catch (error) {
+        statusText.textContent = "Logout failed: " + error.message;
+    } finally {
+        logoutButton.disabled = false;
+    }
+});
+
+
+let isSignUpMode = false;
+
+authScreen.style.display = "flex";
+
+authToggle.addEventListener("click", function () {
+    isSignUpMode = !isSignUpMode;
+
+    authHeading.textContent = isSignUpMode
+        ? "Create your SaurXai account"
+        : "Login to your account";
+
+    authSubmit.textContent = isSignUpMode
+        ? "Create Account"
+        : "Login";
+
+    authToggle.textContent = isSignUpMode
+        ? "Already have an account? Login"
+        : "Create a new account";
+
+    authPassword.autocomplete = isSignUpMode
+        ? "new-password"
+        : "current-password";
+
+    authStatus.textContent = "";
+});
+
+async function initializeSupabaseAuth() {
+    try {
+        const response = await fetch("https://myai-2-wkxz.onrender.com/auth-config");
+        const config = await response.json();
+
+        if (!response.ok) {
+            throw new Error(config.error || "Could not load login settings.");
+        }
+
+        if (!window.supabase || !window.supabase.createClient) {
+            throw new Error("Supabase library did not load. Check your internet connection.");
+        }
+
+        supabaseClient = window.supabase.createClient(
+            config.url,
+            config.publishableKey
+        );
+
+        const { data, error } = await supabaseClient.auth.getSession();
+
+        if (error) throw error;
+
+        session = data.session;
+
+        authScreen.style.display = session ? "none" : "flex";
+
+        supabaseClient.auth.onAuthStateChange(function (event, newSession) {
+            session = newSession;
+            authScreen.style.display = session ? "none" : "flex";
+        });
+
+    } catch (error) {
+        authScreen.style.display = "flex";
+        authStatus.textContent = error.message;
+    }
+}
+
+authForm.addEventListener("submit", async function (event) {
+    event.preventDefault();
+
+    if (!supabaseClient) {
+        authStatus.textContent = "Login is still loading. Please try again.";
+        return;
+    }
+
+    authSubmit.disabled = true;
+    authStatus.textContent = "Please wait...";
+
+    try {
+        const email = authEmail.value.trim();
+        const password = authPassword.value;
+
+        if (isSignUpMode) {
+            const { data, error } = await supabaseClient.auth.signUp({
+                email: email,
+                password: password
+            });
+
+            if (error) throw error;
+
+            if (data.session) {
+                session = data.session;
+                authScreen.style.display = "none";
+                authStatus.textContent = "";
+            } else {
+                authStatus.textContent =
+                    "Account created. Check your email to confirm your account, then login.";
+            }
+
+        } else {
+            const { data, error } =
+                await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+            if (error) throw error;
+
+            session = data.session;
+            authScreen.style.display = "none";
+            authStatus.textContent = "";
+        }
+
+    } catch (error) {
+        authStatus.textContent = error.message;
+    } finally {
+        authSubmit.disabled = false;
+    }
+});
+
+initializeSupabaseAuth().finally(hideSaurXaiLoader);
+
+
+
+
+/* -------------------------
+   ADD MESSAGE
+------------------------- */
+
+function addMessage(text, type) {
+
+    if (welcome) {
+        welcome.remove();
+    }
+
+    const message = document.createElement("div");
+    message.className = "message " + type;
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+
+    bubble.textContent = text;
+
+    message.appendChild(bubble);
+    chatBox.appendChild(message);
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    return bubble;
+}
+
+/* -------------------------
+   AI MESSAGE + LISTEN
+------------------------- */
+
+function addAIMessage(text) {
+
+    const bubble = addMessage(text, "ai");
+
+    const listenButton = document.createElement("button");
+    listenButton.className = "listen-btn";
+    listenButton.textContent = "🔊 Listen";
+
+    listenButton.addEventListener("click", function() {
+        speakText(text);
+    });
+
+    bubble.appendChild(document.createElement("br"));
+    bubble.appendChild(listenButton);
+}
+
+/* -------------------------
+   SPEECH
+------------------------- */
+
+function speakText(text) {
+
+    if (!("speechSynthesis" in window)) {
+        return;
+    }
+
+    window.speechSynthesis.cancel();
+
+    const speech = new SpeechSynthesisUtterance(text);
+
+    speech.lang = "en-IN";
+    speech.rate = 1;
+    speech.pitch = 1;
+
+    window.speechSynthesis.speak(speech);
+}
+
+/* -------------------------
+   SEND MESSAGE
+------------------------- */
+
+async function sendMessage() {
+
+    if (isSending) return;
+
+    const message = userInput.value.trim();
+
+    if (!message) return;
+
+    isSending = true;
+    sendButton.disabled = true;
+
+    addMessage(message, "user");
+
+    /*
+       IMPORTANT:
+       Remove focus from input immediately.
+       This prevents Android keyboard from
+       automatically reopening after AI reply.
+    */
+    userInput.blur();
+
+    userInput.value = "";
+
+    statusText.textContent = "SaurXai is typing...";
+
+    const typingMessage = document.createElement("div");
+    typingMessage.className = "message ai";
+    typingMessage.id = "typingMessage";
+
+    const typingBubble = document.createElement("div");
+    typingBubble.className = "bubble typing";
+    typingBubble.textContent = "Typing...";
+
+    typingMessage.appendChild(typingBubble);
+    chatBox.appendChild(typingMessage);
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    try {
+              
+           const response = await fetch("https://myai-2-wkxz.onrender.com/chat", {
+    method: "POST",
+    headers: {
+        "Content-Type": "application/json",
+         "Authorization": `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify({
+        message: message
+    })
+});
+        const data = await response.json();
+
+        const oldTyping = document.getElementById("typingMessage");
+
+        if (oldTyping) {
+            oldTyping.remove();
+        }
+
+        if (!response.ok) {
+
+            addAIMessage(
+                data.error ||
+                data.message ||
+                "Sorry, something went wrong."
+            );
+
+        } else {
+
+            const reply =
+                data.reply ||
+                data.message ||
+                "I couldn't generate a reply.";
+
+            addAIMessage(reply);
+        }
+
+    } catch (error) {
+
+        const oldTyping = document.getElementById("typingMessage");
+
+        if (oldTyping) {
+            oldTyping.remove();
+        }
+
+        addAIMessage(
+            "Network Error: Please check your connection or server."
+        );
+
+    } finally {
+
+        statusText.textContent = "";
+
+        isSending = false;
+        sendButton.disabled = false;
+
+        /*
+           IMPORTANT:
+           Do NOT use userInput.focus() here.
+           That was causing the keyboard to open again.
+        */
+        userInput.blur();
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+}
+
+/* -------------------------
+   SEND BUTTON
+------------------------- */
+
+sendButton.addEventListener("click", function() {
+    sendMessage();
+});
+
+/* -------------------------
+   ENTER KEY
+------------------------- */
+
+userInput.addEventListener("keydown", function(event) {
+
+    if (event.key === "Enter" && !event.shiftKey) {
+
+        event.preventDefault();
+
+        sendMessage();
+    }
+});
+
+/* -------------------------
+   NEW CHAT
+------------------------- */
+
+newChatButton.addEventListener("click", function() {
+
+    window.speechSynthesis?.cancel();
+
+    chatBox.innerHTML = `
+        <div class="welcome" id="welcome">
+            <div>
+                <div style="font-size:30px;margin-bottom:10px;">🤖</div>
+                <div>Hi! I'm SaurXai.</div>
+                <div style="font-size:13px;margin-top:7px;">
+                    Ask me anything...
+                </div>
+            </div>
+        </div>
+    `;
+
+    userInput.value = "";
+
+    /*
+       Make sure keyboard does not open
+       after New Chat.
+    */
+    userInput.blur();
+
+    statusText.textContent = "";
+});
+
+/* -------------------------
+   SPEECH RECOGNITION
+------------------------- */
+
+const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+if (SpeechRecognition) {
+
+    recognition = new SpeechRecognition();
+
+    recognition.lang = "en-IN";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onstart = function() {
+
+        isListening = true;
+
+        micButton.classList.add("listening");
+        micButton.textContent = "⏹️";
+
+        statusText.textContent = "Listening...";
+    };
+
+    recognition.onresult = function(event) {
+
+        const transcript =
+            event.results[0][0].transcript;
+
+        userInput.value = transcript;
+
+        statusText.textContent = "";
+    };
+
+    recognition.onerror = function() {
+
+        statusText.textContent =
+            "Microphone error";
+
+        isListening = false;
+
+        micButton.classList.remove("listening");
+        micButton.textContent = "🎤";
+    };
+
+    recognition.onend = function() {
+
+        isListening = false;
+
+        micButton.classList.remove("listening");
+        micButton.textContent = "🎤";
+
+        statusText.textContent = "";
+    };
+
+    micButton.addEventListener("click", function() {
+
+        if (isListening) {
+
+            recognition.stop();
+
+        } else {
+
+            try {
+                recognition.start();
+            } catch (error) {
+                console.log(error);
+            }
+        }
+    });
+
+} else {
+
+    micButton.addEventListener("click", function() {
+
+        statusText.textContent =
+            "Speech recognition is not supported in this browser.";
+
+    });
+}
+</script>
+
+</body>
+</html>
